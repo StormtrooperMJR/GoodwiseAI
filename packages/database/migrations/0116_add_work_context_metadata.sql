@@ -1,0 +1,1 @@
+ALTER TABLE "work_contexts" ADD COLUMN "metadata" jsonb;

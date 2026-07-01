@@ -1,4 +1,5 @@
-import { BaseExecutor, type BuiltinToolContext, type BuiltinToolResult } from '@lobechat/types';
+import type { BuiltinToolContext, BuiltinToolResult } from '@lobechat/types';
+import { BaseExecutor } from '@lobechat/types';
 
 import { AgentDocumentsExecutionRuntime } from '../ExecutionRuntime';
 import {
@@ -45,11 +46,14 @@ export class AgentDocumentsExecutor extends BaseExecutor<typeof AgentDocumentsAp
     return this.runtime.createDocument(params, {
       agentId: ctx.agentId,
       currentDocumentId: ctx.documentId,
-      messageId: ctx.sourceMessageId,
+      messageId: ctx.sourceMessageId ?? ctx.messageId,
       operationId: ctx.operationId,
+      rootOperationId: ctx.rootOperationId,
       scope: ctx.scope,
       taskId: ctx.taskId,
+      threadId: ctx.threadId,
       toolCallId: ctx.toolCallId,
+      toolMessageId: ctx.toolMessageId,
       topicId: ctx.topicId,
     });
   };
@@ -72,7 +76,15 @@ export class AgentDocumentsExecutor extends BaseExecutor<typeof AgentDocumentsAp
     return this.runtime.replaceDocumentContent(params, {
       agentId: ctx.agentId,
       currentDocumentId: ctx.documentId,
+      messageId: ctx.sourceMessageId ?? ctx.messageId,
+      operationId: ctx.operationId,
+      rootOperationId: ctx.rootOperationId,
       scope: ctx.scope,
+      taskId: ctx.taskId,
+      threadId: ctx.threadId,
+      toolCallId: ctx.toolCallId,
+      toolMessageId: ctx.toolMessageId,
+      topicId: ctx.topicId,
     });
   };
 
@@ -83,7 +95,15 @@ export class AgentDocumentsExecutor extends BaseExecutor<typeof AgentDocumentsAp
     return this.runtime.modifyNodes(params, {
       agentId: ctx.agentId,
       currentDocumentId: ctx.documentId,
+      messageId: ctx.sourceMessageId ?? ctx.messageId,
+      operationId: ctx.operationId,
+      rootOperationId: ctx.rootOperationId,
       scope: ctx.scope,
+      taskId: ctx.taskId,
+      threadId: ctx.threadId,
+      toolCallId: ctx.toolCallId,
+      toolMessageId: ctx.toolMessageId,
+      topicId: ctx.topicId,
     });
   };
 
@@ -94,7 +114,15 @@ export class AgentDocumentsExecutor extends BaseExecutor<typeof AgentDocumentsAp
     return this.runtime.removeDocument(params, {
       agentId: ctx.agentId,
       currentDocumentId: ctx.documentId,
+      messageId: ctx.sourceMessageId ?? ctx.messageId,
+      operationId: ctx.operationId,
+      rootOperationId: ctx.rootOperationId,
       scope: ctx.scope,
+      taskId: ctx.taskId,
+      threadId: ctx.threadId,
+      toolCallId: ctx.toolCallId,
+      toolMessageId: ctx.toolMessageId,
+      topicId: ctx.topicId,
     });
   };
 
@@ -105,7 +133,15 @@ export class AgentDocumentsExecutor extends BaseExecutor<typeof AgentDocumentsAp
     return this.runtime.renameDocument(params, {
       agentId: ctx.agentId,
       currentDocumentId: ctx.documentId,
+      messageId: ctx.sourceMessageId ?? ctx.messageId,
+      operationId: ctx.operationId,
+      rootOperationId: ctx.rootOperationId,
       scope: ctx.scope,
+      taskId: ctx.taskId,
+      threadId: ctx.threadId,
+      toolCallId: ctx.toolCallId,
+      toolMessageId: ctx.toolMessageId,
+      topicId: ctx.topicId,
     });
   };
 
@@ -116,7 +152,15 @@ export class AgentDocumentsExecutor extends BaseExecutor<typeof AgentDocumentsAp
     return this.runtime.copyDocument(params, {
       agentId: ctx.agentId,
       currentDocumentId: ctx.documentId,
+      messageId: ctx.sourceMessageId ?? ctx.messageId,
+      operationId: ctx.operationId,
+      rootOperationId: ctx.rootOperationId,
       scope: ctx.scope,
+      taskId: ctx.taskId,
+      threadId: ctx.threadId,
+      toolCallId: ctx.toolCallId,
+      toolMessageId: ctx.toolMessageId,
+      topicId: ctx.topicId,
     });
   };
 

@@ -45,25 +45,31 @@ interface AgentDocumentOperationContext {
   currentDocumentId?: string | null;
   messageId?: string | null;
   operationId?: string | null;
+  rootOperationId?: string | null;
   scope?: string | null;
   taskId?: string | null;
+  threadId?: string | null;
   toolCallId?: string | null;
+  toolMessageId?: string | null;
   topicId?: string | null;
 }
 
 /**
- * Attribution data captured from a builtin tool call that creates an agent document.
+ * Attribution data captured from a builtin tool call that mutates an agent document.
  */
 interface AgentDocumentToolContext {
   messageId: string;
   operationId?: string;
+  rootOperationId?: string;
   taskId?: string | null;
+  threadId?: string | null;
   toolCallId: string;
+  toolMessageId?: string;
   topicId?: string;
 }
 
 /**
- * Tool-call attribution input for document create operations.
+ * Tool-call attribution input for document mutation operations.
  */
 interface AgentDocumentToolTriggerInput {
   /**
@@ -85,7 +91,7 @@ export interface AgentDocumentsRuntimeService {
   copyDocument: (
     params: CopyDocumentArgs & {
       agentId: string;
-    },
+    } & AgentDocumentToolTriggerInput,
   ) => Promise<AgentDocumentRecord | undefined>;
   createDocument: (
     params: CreateDocumentArgs & {
@@ -112,7 +118,7 @@ export interface AgentDocumentsRuntimeService {
   modifyNodes: (
     params: ModifyDocumentNodesArgs & {
       agentId: string;
-    },
+    } & AgentDocumentToolTriggerInput,
   ) => Promise<AgentDocumentRecord | undefined>;
   readDocument: (
     params: ReadDocumentArgs & {
@@ -122,17 +128,17 @@ export interface AgentDocumentsRuntimeService {
   removeDocument: (
     params: RemoveDocumentArgs & {
       agentId: string;
-    },
+    } & AgentDocumentToolTriggerInput,
   ) => Promise<boolean>;
   renameDocument: (
     params: RenameDocumentArgs & {
       agentId: string;
-    },
+    } & AgentDocumentToolTriggerInput,
   ) => Promise<AgentDocumentRecord | undefined>;
   replaceDocumentContent: (
     params: ReplaceDocumentContentArgs & {
       agentId: string;
-    },
+    } & AgentDocumentToolTriggerInput,
   ) => Promise<AgentDocumentRecord | undefined>;
   updateLoadRule: (
     params: UpdateLoadRuleArgs & {
@@ -196,7 +202,10 @@ export class AgentDocumentsExecutionRuntime {
     };
 
     if (context.operationId) toolContext.operationId = context.operationId;
+    if (context.rootOperationId) toolContext.rootOperationId = context.rootOperationId;
     if (context.taskId) toolContext.taskId = context.taskId;
+    if (context.threadId) toolContext.threadId = context.threadId;
+    if (context.toolMessageId) toolContext.toolMessageId = context.toolMessageId;
     if (context.topicId) toolContext.topicId = context.topicId;
 
     return {
@@ -383,7 +392,11 @@ export class AgentDocumentsExecutionRuntime {
       return this.buildCurrentPageDocumentWriteBlockedResult('replaceDocumentContent');
     }
 
-    const doc = await this.service.replaceDocumentContent({ ...args, agentId });
+    const doc = await this.service.replaceDocumentContent({
+      ...args,
+      ...this.buildToolTriggerInput(context),
+      agentId,
+    });
     if (!doc) return { content: `Failed to update document ${args.id}.`, success: false };
 
     const url = await this.buildDocumentUrl(agentId, doc.documentId ?? existing.documentId);
@@ -423,7 +436,12 @@ export class AgentDocumentsExecutionRuntime {
       return { content: 'No operations provided.', success: false };
     }
 
-    const updated = await this.service.modifyNodes({ agentId, id: args.id, operations });
+    const updated = await this.service.modifyNodes({
+      agentId,
+      ...this.buildToolTriggerInput(context),
+      id: args.id,
+      operations,
+    });
     if (!updated) return { content: `Failed to modify document ${args.id}.`, success: false };
 
     const results = operations.map((operation) => ({
@@ -462,7 +480,11 @@ export class AgentDocumentsExecutionRuntime {
       };
     }
 
-    const deleted = await this.service.removeDocument({ ...args, agentId });
+    const deleted = await this.service.removeDocument({
+      ...args,
+      ...this.buildToolTriggerInput(context),
+      agentId,
+    });
     if (!deleted) return { content: `Document not found: ${args.id}`, success: false };
 
     return {
@@ -491,7 +513,11 @@ export class AgentDocumentsExecutionRuntime {
       return this.buildCurrentPageDocumentWriteBlockedResult('renameDocument');
     }
 
-    const doc = await this.service.renameDocument({ ...args, agentId });
+    const doc = await this.service.renameDocument({
+      ...args,
+      ...this.buildToolTriggerInput(context),
+      agentId,
+    });
     if (!doc) return { content: `Failed to rename document ${args.id}.`, success: false };
 
     const url = await this.buildDocumentUrl(agentId, doc.documentId ?? existing.documentId);
@@ -515,7 +541,11 @@ export class AgentDocumentsExecutionRuntime {
       };
     }
 
-    const copied = await this.service.copyDocument({ ...args, agentId });
+    const copied = await this.service.copyDocument({
+      ...args,
+      ...this.buildToolTriggerInput(context),
+      agentId,
+    });
     if (!copied) return { content: `Document not found: ${args.id}`, success: false };
 
     const url = await this.buildDocumentUrl(agentId, copied.documentId);
