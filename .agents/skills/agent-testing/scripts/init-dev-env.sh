@@ -16,6 +16,7 @@
 #   init-dev-env.sh migrate          # run DB migrations against the configured DB
 #   init-dev-env.sh seed-user        # seed the baseline test user + CLI API key
 #   init-dev-env.sh qstash           # run local Upstash QStash dev server
+#   init-dev-env.sh preflight        # check agent-runtime prerequisites (QStash up in queue mode)
 #   init-dev-env.sh dev-next         # exec `pnpm run dev:next` with this env
 #   init-dev-env.sh dev              # exec `bun run dev` with this env
 #   init-dev-env.sh clean-db         # remove the managed Postgres/Redis containers
@@ -104,6 +105,15 @@ QSTASH_LOCAL_NEXT_SIGNING_KEY="${QSTASH_LOCAL_NEXT_SIGNING_KEY:-sig_5ZB6DVzB1wjE
 ok() { printf '  \033[32m✔\033[0m %s\n' "$1"; }
 bad() { printf '  \033[31m✘\033[0m %s\n' "$1"; }
 note() { printf '      %s\n' "$1"; }
+
+# A URL is "reachable" when it answers with any HTTP status (QStash returns 401
+# without a token). Connection refused / no route yields curl code 000.
+_http_reachable() {
+  local url="$1" code
+  command -v curl > /dev/null 2>&1 || return 2
+  code="$(curl -s -o /dev/null -m 3 -w '%{http_code}' "$url" 2>/dev/null || true)"
+  [[ -n "$code" && "$code" != "000" ]]
+}
 
 guard_no_root_env() {
   if [[ -f "$ROOT_ENV_FILE" ]]; then
@@ -449,6 +459,55 @@ cmd_status() {
   else
     bad "docker CLI is not available"
   fi
+  if _http_reachable "$QSTASH_URL"; then
+    ok "QStash reachable: $QSTASH_URL"
+  else
+    note "QStash is not running at $QSTASH_URL (needed for agent-runtime / queue mode)"
+  fi
+}
+
+# Prerequisite gate for agent-runtime tests. In queue mode (the default here and
+# in production) creating an agent operation POSTs to QStash; if QStash is down
+# the run fails with `ECONNREFUSED 127.0.0.1:8080 / fetch failed` at operation
+# creation — before any LLM call, so no trace is ever recorded. Run this before
+# `lh agent run` (or any durable-op path) and start `qstash` if it fails.
+cmd_preflight() {
+  apply_env
+  local failed=0
+  echo "agent-runtime preflight (AGENT_RUNTIME_MODE=$AGENT_RUNTIME_MODE):"
+
+  if command -v docker > /dev/null 2>&1 &&
+    docker ps --format '{{.Names}}' | grep -Fxq "$REDIS_CONTAINER"; then
+    ok "Redis running: $REDIS_CONTAINER (queue-mode state)"
+  else
+    bad "Redis not running: $REDIS_CONTAINER"
+    note "start it with: $0 setup-db"
+    failed=1
+  fi
+
+  if [[ "$AGENT_RUNTIME_MODE" == "queue" ]]; then
+    if _http_reachable "$QSTASH_URL"; then
+      ok "QStash reachable: $QSTASH_URL (operation dispatch)"
+    else
+      bad "QStash NOT reachable at $QSTASH_URL — agent runs will fail with 'fetch failed' (ECONNREFUSED)"
+      note "start it in a separate terminal: $0 qstash"
+      failed=1
+    fi
+  else
+    note "AGENT_RUNTIME_MODE=$AGENT_RUNTIME_MODE (not queue) — QStash not required"
+  fi
+
+  if _http_reachable "$APP_URL"; then
+    ok "dev server reachable: $APP_URL"
+  else
+    note "dev server not reachable at $APP_URL — start it with: $0 dev"
+  fi
+
+  if [[ "$failed" == 1 ]]; then
+    bad "preflight failed — resolve the above before running agent-runtime tests"
+    return 1
+  fi
+  ok "preflight passed — safe to run agent-runtime tests"
 }
 
 cmd_qstash() {
@@ -520,6 +579,7 @@ case "$COMMAND" in
   migrate) migrate_db ;;
   seed-user) seed_user ;;
   qstash) cmd_qstash ;;
+  preflight) cmd_preflight ;;
   dev-next) cmd_dev_next ;;
   dev) cmd_dev ;;
   clean-db) cmd_clean_db ;;
